@@ -15,7 +15,6 @@ public class AppUserDetailsService implements UserDetailsService {
     @Autowired
     private AppUserRepository appUserRepository;
 
-
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         AppUser appUser = appUserRepository.findByEmail(email)
