@@ -7,7 +7,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
-import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,14 +17,13 @@ import java.util.Map;
 import java.util.function.Function;
 
 @Service
-@Getter
-@Setter
 public class JWTService {
 
     @Value("${security.jwt.secret-key}")
     private String secretKey;
 
-    @Value("${security.jwt.expiration-time")
+    @Value("${security.jwt.expiration-time:3600000}")
+    @Getter
     private long jwtExpirationTime;
 
     public String extractUsername(String token){
@@ -60,7 +58,7 @@ public class JWTService {
                 .add(claims)
                 .subject(email)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + getJwtExpirationTime()))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationTime))
                 .and()
                 .signWith(getSigningKey())
                 .compact();
@@ -78,5 +76,7 @@ public class JWTService {
     public Date extractExpirationTime(String token){
         return extractClaim(token, Claims::getExpiration);
     }
+
+
 
 }
