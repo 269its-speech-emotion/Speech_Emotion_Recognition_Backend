@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class AudioRecordingService {
@@ -54,7 +55,7 @@ public class AudioRecordingService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         AppUserDetails userPrincipal = (AppUserDetails) auth.getPrincipal();
 
-        if(userPrincipal.getId() != audioRecording.getAppUser().getId()){
+        if(!Objects.equals(userPrincipal.getId(), audioRecording.getAppUser().getId())){
             throw new AccessDeniedException("You are not authorized to access this audio recording");
         }
 

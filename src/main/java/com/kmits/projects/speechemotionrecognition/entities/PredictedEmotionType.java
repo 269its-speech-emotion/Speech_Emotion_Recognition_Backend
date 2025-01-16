@@ -8,5 +8,5 @@ public enum PredictedEmotionType {
     HAPPY,
     NEUTRAL,
     SAD,
-    SURPRISE;
+    SURPRISE
 }

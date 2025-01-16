@@ -6,7 +6,6 @@ import com.kmits.projects.speechemotionrecognition.services.AudioRecordingServic
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 @RestController
@@ -27,12 +26,12 @@ public class AudioRecordingController {
     }
 
     @PostMapping("/update/{id}")
-    public AudioRecording setSelf(@RequestBody AudioRecording putRequest, @PathVariable Long id) throws AccessDeniedException {
+    public AudioRecording setSelf(@RequestBody AudioRecording putRequest, @PathVariable Long id) {
         putRequest.setId(id);
         return audioRecordingService.setAudioRecording(putRequest);
     }
 
-    @PostMapping("delete/{id}")
+    @DeleteMapping("delete/{id}")
     public void deleteAudioRecording(@PathVariable Long id){
         audioRecordingService.deleteAudioRecording(id);
     }

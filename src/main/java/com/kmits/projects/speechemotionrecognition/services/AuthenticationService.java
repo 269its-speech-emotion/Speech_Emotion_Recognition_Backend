@@ -32,7 +32,7 @@ public class AuthenticationService {
     @Autowired
     private EmailNotificationService notificationService;
 
-    int VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN = 15;
+    final int VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN = 15;
 
     public AppUser signup(AppUser request){
         if(appUserRepository.findByEmail(request.getEmail()).isPresent()){

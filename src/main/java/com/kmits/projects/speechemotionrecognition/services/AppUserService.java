@@ -22,4 +22,15 @@ public class AppUserService {
         return appUserRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userPrincipal.getId()));
     }
+
+
+    public void deleteAppUser(Long id){
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AppUserDetails userPrincipal = (AppUserDetails) auth.getPrincipal();
+
+        AppUser appUser = appUserRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        appUserRepository.delete(appUser);
+    }
 }

@@ -21,11 +21,11 @@ public class AudioRecording {
     private String url;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "predicted_emotion_type", nullable = true)
+    @Column(name = "predicted_emotion_type")
     public PredictedEmotionType predictedEmotionType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "user_assessment", nullable = true)
+    @Column(name = "user_assessment")
     public UserAssessment userAssessment;
 
     @JoinColumn(name = "user_id", nullable = false)
