@@ -1,15 +1,18 @@
 package com.kmits.projects.speechemotionrecognition.services;
 
-import com.kmits.projects.speechemotionrecognition.entities.AppUser;
-import com.kmits.projects.speechemotionrecognition.entities.AppUserDetails;
-import com.kmits.projects.speechemotionrecognition.entities.AudioRecording;
+import com.kmits.projects.speechemotionrecognition.entities.*;
 import com.kmits.projects.speechemotionrecognition.repositories.AppUserRepository;
 import com.kmits.projects.speechemotionrecognition.repositories.AudioRecordingRepository;
+import com.kmits.projects.speechemotionrecognition.requests.audiorecording.GetAudioRecordingResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.nio.file.AccessDeniedException;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AudioRecordingService {
@@ -34,5 +37,54 @@ public class AudioRecordingService {
         return audioRecordingRepository.save(audioRecording);
     }
 
+    public List<GetAudioRecordingResponse> getAudioRecordings(){
+        var audioRecordings = new ArrayList<GetAudioRecordingResponse>();
+        for (AudioRecording audio : audioRecordingRepository.findAll())
+            audioRecordings.add(new GetAudioRecordingResponse(audio));
 
+        return audioRecordings;
+    }
+
+    public AudioRecording setAudioRecording(AudioRecording putRequest) throws AccessDeniedException {
+        AudioRecording audioRecording = audioRecordingRepository.findById(putRequest.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Audio recording not found with ID: " + putRequest.getId()));
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AppUserDetails userPrincipal = (AppUserDetails) auth.getPrincipal();
+
+        if(userPrincipal.getId() != audioRecording.getAppUser().getId()){
+            throw new AccessDeniedException("You are not authorized to access this audio recording");
+        }
+
+        if (putRequest.getGeneratedTitle() != null && !putRequest.getGeneratedTitle().isEmpty()) {
+            audioRecording.setGeneratedTitle(putRequest.getGeneratedTitle());
+        } else {
+            throw new IllegalArgumentException("GeneratedTitle cannot be null or empty");
+        }
+
+        if (putRequest.getUrl() != null && !putRequest.getUrl().isEmpty()) {
+            audioRecording.setUrl(putRequest.getUrl());
+        } else {
+            throw new IllegalArgumentException("URL cannot be null or empty");
+        }
+
+        try {
+            PredictedEmotionType predictedEmotionType = PredictedEmotionType.valueOf(putRequest.getPredictedEmotionType().toString());
+            audioRecording.setPredictedEmotionType(predictedEmotionType);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid PredictedEmotionType: " + putRequest.getPredictedEmotionType());
+        }
+
+        if (putRequest.getUserAssessment() != null) {
+
+            try {
+                UserAssessment userAssessment = UserAssessment.valueOf(putRequest.getUserAssessment().toString());
+                audioRecording.setUserAssessment(userAssessment);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid UserAssessment: " + putRequest.getUserAssessment());
+            }
+        }
+
+        return audioRecordingRepository.save(audioRecording);
+    }
 }
