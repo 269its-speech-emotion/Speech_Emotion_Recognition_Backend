@@ -6,11 +6,11 @@ import com.kmits.projects.speechemotionrecognition.repositories.AudioRecordingRe
 import com.kmits.projects.speechemotionrecognition.requests.audiorecording.GetAudioRecordingResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +37,7 @@ public class AudioRecordingService {
         return audioRecordingRepository.save(audioRecording);
     }
 
+
     public List<GetAudioRecordingResponse> getAudioRecordings(){
         var audioRecordings = new ArrayList<GetAudioRecordingResponse>();
         for (AudioRecording audio : audioRecordingRepository.findAll())
@@ -45,7 +46,8 @@ public class AudioRecordingService {
         return audioRecordings;
     }
 
-    public AudioRecording setAudioRecording(AudioRecording putRequest) throws AccessDeniedException {
+
+    public AudioRecording setAudioRecording(AudioRecording putRequest) {
         AudioRecording audioRecording = audioRecordingRepository.findById(putRequest.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Audio recording not found with ID: " + putRequest.getId()));
 
@@ -86,5 +88,20 @@ public class AudioRecordingService {
         }
 
         return audioRecordingRepository.save(audioRecording);
+    }
+
+
+    public void deleteAudioRecording(Long id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AppUserDetails userPrincipal= (AppUserDetails) auth.getPrincipal();
+
+        AudioRecording audioRecording = audioRecordingRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("No Audio recording found with id: "+id));
+
+        if(!audioRecording.getAppUser().getId().equals(userPrincipal.getId())){
+            throw new AccessDeniedException("You are not allowed to delete this audio recording");
+        }
+
+        audioRecordingRepository.delete(audioRecording);
     }
 }

@@ -32,5 +32,10 @@ public class AudioRecordingController {
         return audioRecordingService.setAudioRecording(putRequest);
     }
 
+    @PostMapping("delete/{id}")
+    public void deleteAudioRecording(@PathVariable Long id){
+        audioRecordingService.deleteAudioRecording(id);
+    }
+
 
 }
