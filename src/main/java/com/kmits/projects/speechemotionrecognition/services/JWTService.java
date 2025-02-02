@@ -22,7 +22,7 @@ public class JWTService {
     @Value("${security.jwt.secret-key}")
     private String secretKey;
 
-    @Value("${security.jwt.expiration-time:3600000}")
+    @Value("${security.jwt.expiration-time:86400000}")
     @Getter
     private long jwtExpirationTime;
 
@@ -76,7 +76,5 @@ public class JWTService {
     public Date extractExpirationTime(String token){
         return extractClaim(token, Claims::getExpiration);
     }
-
-
 
 }

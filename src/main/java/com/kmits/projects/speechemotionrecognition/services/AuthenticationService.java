@@ -1,12 +1,16 @@
 package com.kmits.projects.speechemotionrecognition.services;
 
+import com.kmits.projects.speechemotionrecognition.dtos.*;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.*;
 import com.kmits.projects.speechemotionrecognition.entities.AppUser;
 import com.kmits.projects.speechemotionrecognition.entities.Role;
 import com.kmits.projects.speechemotionrecognition.repositories.AppUserRepository;
+import com.kmits.projects.speechemotionrecognition.utils.Utils;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -34,52 +38,90 @@ public class AuthenticationService {
 
     final int VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN = 15;
 
-    public AppUser signup(AppUser request){
-        if(appUserRepository.findByEmail(request.getEmail()).isPresent()){
-            throw new IllegalArgumentException("This email is already in use");
+    public SignUpResponseDTO signup(SignUpRequestDTO request){
+        SignUpResponseDTO signUpResponseDTO = new SignUpResponseDTO();
+        try {
+            if(appUserRepository.findByEmail(request.getEmail()).isPresent()){
+                throw new IllegalArgumentException("This email is already in use");
+            }
+
+            if(appUserRepository.findByUsername(request.getUsername()).isPresent()){
+                throw new IllegalArgumentException("This username is already in use");
+            }
+
+            AppUser appUser = new AppUser();
+            appUser.setEmail(request.getEmail());
+            appUser.setUsername(request.getUsername());
+            appUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            appUser.setVerificationCode(generateVerificationCode());
+            appUser.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN));
+            appUser.setEnabled(false);
+            appUser.setRole(Role.ROLE_USER);
+
+            //sendVerificationEmail(appUser);
+
+            AppUser savedUser = appUserRepository.save(appUser);
+            AppUserDTO userDTO = Utils.mapAppUserToAppUserDTO(savedUser);
+            signUpResponseDTO.setStatusCode(200);
+            signUpResponseDTO.setAppUserDTO(userDTO);
+        } catch (IllegalArgumentException e) {
+            signUpResponseDTO.setStatusCode(400);
+            signUpResponseDTO.setMessage(e.getMessage());
+        } catch (Exception error){
+            signUpResponseDTO.setStatusCode(500);
+            signUpResponseDTO.setMessage("Error occurred during user registration: "+ error.getMessage());
+            System.out.println(error.getMessage());
         }
 
-        if(appUserRepository.findByUsername(request.getUsername()).isPresent()){
-            throw new IllegalArgumentException("This username is already in use");
-        }
-
-        AppUser appUser = new AppUser();
-        appUser.setEmail(request.getEmail());
-        appUser.setUsername(request.getUsername());
-        appUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        appUser.setVerificationCode(generateVerificationCode());
-        appUser.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN));
-        appUser.setEnabled(false);
-        appUser.setRole(Role.ROLE_USER);
-        appUser.setAudioRecordings(request.getAudioRecordings());
-
-        //sendVerificationEmail(appUser);
-
-        return appUserRepository.save(appUser);
+        return signUpResponseDTO;
     }
 
 
-    public AppUser login(AppUser request){
+
+    public LogInResponseDTO login(LogInRequestDTO request){
+        System.out.println(request.getEmail() + " "+request.getPassword());
         AppUser appUser = appUserRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found with email: "+request.getEmail()));
+
+        System.out.println(appUser.toString());
 
         if(!appUser.isEnabled()){
             throw new RuntimeException("Account not verified. Please verify your account");
         }
+        LogInResponseDTO response = new LogInResponseDTO();
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+            String generatedToken = jwtService.generateToken(appUser);
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+            response.setStatusCode(200);
+            response.setMessage("Login successful");
+            response.setToken(generatedToken);
+            response.setExpiresIn(jwtService.getJwtExpirationTime());
 
-        return appUser;
+            System.out.println(response.getStatusCode() + " "+response.getToken());
+
+            return response;
+
+        }catch (AuthenticationException e) {
+            // invalid email or password
+            response.setStatusCode(203);
+            response.setMessage("Invalid email or password");
+            response.setToken(null);
+            response.setExpiresIn(0);
+            return response;
+        }
+
     }
 
 
-    public void verifyAppUser(AppUser request){
+    public VerificationResponseDTO verifyAppUser(VerificationRequestDTO request){
         Optional<AppUser> optionalAppUser = appUserRepository.findByEmail(request.getEmail());
+        VerificationResponseDTO response = new VerificationResponseDTO();
         if(optionalAppUser.isPresent()){
             AppUser appUser = optionalAppUser.get();
             if(appUser.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())){
@@ -90,13 +132,18 @@ public class AuthenticationService {
                 appUser.setVerificationCode(null);
                 appUser.setVerificationCodeExpiresAt(null);
                 appUserRepository.save(appUser);
-            }else {
-                throw new RuntimeException("Invalid verification code");
 
+                response.setStatusCode(200);
+                response.setEnabled(true);
+            }else {
+                response.setStatusCode(400);
+                response.setEnabled(false);
             }
         }else {
-            throw new RuntimeException("User not found");
+            response.setStatusCode(300);
+            response.setEnabled(false);
         }
+        return response;
     }
 
 
@@ -129,5 +176,59 @@ public class AuthenticationService {
         int code = random.nextInt(900000) + 100000;
         return String.valueOf(code);
     }
+
+
+    public NewVerificationCodeResponseDTO requestVerificationCode(NewVerificationCodeRequestDTO request){
+        Optional<AppUser> optionalAppUser = appUserRepository.findByEmail(request.getEmail());
+
+        NewVerificationCodeResponseDTO response = new NewVerificationCodeResponseDTO();
+
+        if(optionalAppUser.isPresent()){
+            AppUser appUser = optionalAppUser.get();
+            appUser.setVerificationCode(generateVerificationCode());
+            appUser.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN));
+            appUserRepository.save(appUser);
+
+            response.setStatusCode(200);
+            response.setMessage("New verification code was generated and expired at :"+ appUser.getVerificationCodeExpiresAt());
+            response.setNewVerificationCode(appUser.getVerificationCode());
+        }else{
+            response.setStatusCode(203);
+            response.setMessage("Do not have an account with this email: "+request.getEmail());
+        }
+
+        return response;
+    }
+
+
+    public RenewPasswordResponseDTO renewPassword(RenewPasswordRequestDTO request) {
+        Optional<AppUser> optionalAppUser = appUserRepository.findByEmail(request.getEmail());
+
+        RenewPasswordResponseDTO response = new RenewPasswordResponseDTO();
+
+        if(optionalAppUser.isPresent()){
+            AppUser appUser = optionalAppUser.get();
+            if(appUser.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())){
+                throw new RuntimeException("Verification code has expired");
+            }
+            if(appUser.getVerificationCode().equals(request.getVerificationCode())){
+                appUser.setVerificationCode(null);
+                appUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+                appUserRepository.save(appUser);
+
+                response.setStatusCode(200);
+                response.setMessage("Password renewed successfully");
+            }else {
+                response.setStatusCode(205);
+                response.setMessage("You provided a wrong verification code, please recheck");
+            }
+        }else {
+            response.setStatusCode(208);
+            response.setMessage("Provided verification code expired, please request a new one");
+        }
+
+        return response;
+    }
+
 
 }

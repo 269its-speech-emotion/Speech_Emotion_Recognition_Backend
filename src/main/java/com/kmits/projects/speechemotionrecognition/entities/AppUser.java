@@ -42,4 +42,19 @@ public class AppUser {
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<AudioRecording> audioRecordings;
+
+    @Override
+    public String toString() {
+        return "AppUser{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", email='" + email + '\'' +
+                ", password='" + password + '\'' +
+                ", verificationCode='" + verificationCode + '\'' +
+                ", verificationCodeExpiresAt=" + verificationCodeExpiresAt +
+                ", enabled=" + enabled +
+                ", role=" + role +
+                ", audioRecordings=" + audioRecordings +
+                '}';
+    }
 }

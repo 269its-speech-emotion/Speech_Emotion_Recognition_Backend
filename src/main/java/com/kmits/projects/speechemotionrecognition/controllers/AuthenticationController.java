@@ -1,7 +1,6 @@
 package com.kmits.projects.speechemotionrecognition.controllers;
 
-import com.kmits.projects.speechemotionrecognition.entities.AppUser;
-import com.kmits.projects.speechemotionrecognition.requests.user.LoginResponse;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.*;
 import com.kmits.projects.speechemotionrecognition.services.AuthenticationService;
 import com.kmits.projects.speechemotionrecognition.services.JWTService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,31 +20,36 @@ public class AuthenticationController {
     @Autowired
     private JWTService jwtService;
 
-
     @PostMapping("/signup")
-    public ResponseEntity<AppUser> signup(@RequestBody AppUser request){
-        return ResponseEntity.ok(authenticationService.signup(request));
+    public ResponseEntity<SignUpResponseDTO> signup(@RequestBody SignUpRequestDTO request){
+        SignUpResponseDTO signUpResponseDTO = authenticationService.signup(request);
+        return ResponseEntity.status(signUpResponseDTO.getStatusCode()).body(signUpResponseDTO);
     }
 
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody AppUser request){
-        AppUser authenticatedAppUser = authenticationService.login(request);
-        String generatedToken = jwtService.generateToken(authenticatedAppUser);
-        LoginResponse loginResponse = new LoginResponse(generatedToken, jwtService.getJwtExpirationTime());
-        return ResponseEntity.ok(loginResponse);
+    public ResponseEntity<LogInResponseDTO> login(@RequestBody LogInRequestDTO request){
+        LogInResponseDTO response = authenticationService.login(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 
 
-    @RequestMapping("/verify")
-    public ResponseEntity<?> verifyUser(@RequestBody AppUser appUser){
-        try {
-            authenticationService.verifyAppUser(appUser);
-            return ResponseEntity.ok("Account verified successfully");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    @PostMapping("/verify")
+    public ResponseEntity<VerificationResponseDTO> verifyUser(@RequestBody VerificationRequestDTO request){
+        VerificationResponseDTO response = authenticationService.verifyAppUser(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 
+    @PostMapping("request-verification-code")
+    public ResponseEntity<NewVerificationCodeResponseDTO> requestNewVerificationCode(@RequestBody NewVerificationCodeRequestDTO request){
+        NewVerificationCodeResponseDTO response = authenticationService.requestVerificationCode(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
+
+    @PostMapping("/renew-password")
+    public ResponseEntity<RenewPasswordResponseDTO> renewPassword(@RequestBody RenewPasswordRequestDTO request){
+        RenewPasswordResponseDTO response = authenticationService.renewPassword(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
+    }
 
 }
