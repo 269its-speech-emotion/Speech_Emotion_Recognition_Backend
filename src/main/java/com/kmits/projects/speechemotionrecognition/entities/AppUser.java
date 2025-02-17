@@ -39,6 +39,9 @@ public class AppUser {
     @Column(name = "role", nullable = false)
     private Role role = Role.ROLE_USER;
 
+    @OneToMany(mappedBy = "appUser")
+    private List<Token> tokens ;
+
     @OneToMany(mappedBy = "appUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<AudioRecording> audioRecordings;

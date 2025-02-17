@@ -1,13 +1,15 @@
 package com.kmits.projects.speechemotionrecognition.services;
 
-import com.kmits.projects.speechemotionrecognition.dtos.*;
+import com.kmits.projects.speechemotionrecognition.dtos.AppUserDTO;
 import com.kmits.projects.speechemotionrecognition.dtos.auth.*;
 import com.kmits.projects.speechemotionrecognition.entities.AppUser;
 import com.kmits.projects.speechemotionrecognition.entities.Role;
+import com.kmits.projects.speechemotionrecognition.entities.Token;
 import com.kmits.projects.speechemotionrecognition.repositories.AppUserRepository;
+import com.kmits.projects.speechemotionrecognition.repositories.TokenRepository;
 import com.kmits.projects.speechemotionrecognition.utils.Utils;
 import jakarta.mail.MessagingException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -19,34 +21,32 @@ import java.util.Optional;
 import java.util.Random;
 
 @Service
+@RequiredArgsConstructor
 public class AuthenticationService {
 
-    @Autowired
-    private AppUserRepository appUserRepository;
-
-    @Autowired
-    private JWTService jwtService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private EmailNotificationService notificationService;
+    private final AppUserRepository appUserRepository;
+    private final TokenRepository tokenRepository;
+    private final JWTService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final EmailNotificationService notificationService;
 
     final int VERIFICATION_CODE_VALIDITY_TIMES_IN_MIN = 15;
 
     public SignUpResponseDTO signup(SignUpRequestDTO request){
         SignUpResponseDTO signUpResponseDTO = new SignUpResponseDTO();
+
         try {
             if(appUserRepository.findByEmail(request.getEmail()).isPresent()){
-                throw new IllegalArgumentException("This email is already in use");
+                signUpResponseDTO.setStatusCode(220);
+                signUpResponseDTO.setMessage("This email is already in use");
+                return signUpResponseDTO;
             }
 
             if(appUserRepository.findByUsername(request.getUsername()).isPresent()){
-                throw new IllegalArgumentException("This username is already in use");
+                signUpResponseDTO.setStatusCode(220);
+                signUpResponseDTO.setMessage("This username is already in use");
+                return signUpResponseDTO;
             }
 
             AppUser appUser = new AppUser();
@@ -79,69 +79,82 @@ public class AuthenticationService {
 
 
     public LogInResponseDTO login(LogInRequestDTO request){
-        System.out.println(request.getEmail() + " "+request.getPassword());
-        AppUser appUser = appUserRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found with email: "+request.getEmail()));
+        Optional<AppUser> optionalAppUser = appUserRepository.findByEmail(request.getEmail());
 
-        System.out.println(appUser.toString());
-
-        if(!appUser.isEnabled()){
-            throw new RuntimeException("Account not verified. Please verify your account");
-        }
         LogInResponseDTO response = new LogInResponseDTO();
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
-                            request.getPassword()
-                    )
-            );
-            String generatedToken = jwtService.generateToken(appUser);
 
-            response.setStatusCode(200);
-            response.setMessage("Login successful");
-            response.setToken(generatedToken);
-            response.setExpiresIn(jwtService.getJwtExpirationTime());
+        if(optionalAppUser.isPresent()){
+            var appUser = optionalAppUser.get();
+            if(appUser.isEnabled()) {
+                try {
+                    authenticationManager.authenticate(
+                            new UsernamePasswordAuthenticationToken(
+                                    request.getEmail(),
+                                    request.getPassword()
+                            )
+                    );
 
-            System.out.println(response.getStatusCode() + " "+response.getToken());
+                    String generatedJWTToken = jwtService.generateToken(appUser);
 
-            return response;
+                    revokeAllUserTokens(appUser);
 
-        }catch (AuthenticationException e) {
-            // invalid email or password
-            response.setStatusCode(203);
-            response.setMessage("Invalid email or password");
-            response.setToken(null);
-            response.setExpiresIn(0);
+                    var token = saveAppUserJWTToken(appUser, generatedJWTToken);
+
+                    tokenRepository.save(token);
+
+                    response.setStatusCode(200);
+                    response.setMessage("Login successful");
+                    response.setToken(generatedJWTToken);
+                    response.setExpiresIn(jwtService.getJwtExpirationTime());
+
+                    return response;
+
+                } catch (AuthenticationException e) {
+                    // invalid email or password
+                    response.setStatusCode(203);
+                    response.setMessage("Invalid email or password");
+                    response.setToken(null);
+                    response.setExpiresIn(0);
+                    return response;
+                }
+            }else { // user account not enabled
+                response.setStatusCode(210);
+                response.setMessage("Account not verified. Please verify your account");
+                return response;
+            }
+
+        }else { // user with non-existing email
+            response.setStatusCode(220);
+            response.setMessage("User not found with email: "+request.getEmail());
             return response;
         }
-
     }
-
 
     public VerificationResponseDTO verifyAppUser(VerificationRequestDTO request){
         Optional<AppUser> optionalAppUser = appUserRepository.findByEmail(request.getEmail());
         VerificationResponseDTO response = new VerificationResponseDTO();
-        if(optionalAppUser.isPresent()){
+        if(optionalAppUser.isPresent()) {
             AppUser appUser = optionalAppUser.get();
-            if(appUser.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())){
-                throw new RuntimeException("Verification code has expired");
-            }
-            if(appUser.getVerificationCode().equals(request.getVerificationCode())){
-                appUser.setEnabled(true);
-                appUser.setVerificationCode(null);
-                appUser.setVerificationCodeExpiresAt(null);
-                appUserRepository.save(appUser);
+            if(!appUser.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())){
+                if(appUser.getVerificationCode().equals(request.getVerificationCode())){
+                    appUser.setEnabled(true);
+                    appUser.setVerificationCode(null);
+                    appUser.setVerificationCodeExpiresAt(null);
+                    appUserRepository.save(appUser);
 
-                response.setStatusCode(200);
-                response.setEnabled(true);
+                    response.setStatusCode(200);
+                    response.setMessage("Your account is enabled. you can log in now !!!");
+                }else {
+                    response.setStatusCode(210);
+                    response.setMessage("Provided verification code is wrong");
+                }
             }else {
-                response.setStatusCode(400);
-                response.setEnabled(false);
+                response.setStatusCode(220);
+                response.setMessage("Verification code: "+request.getVerificationCode()+" is expired");
             }
-        }else {
-            response.setStatusCode(300);
-            response.setEnabled(false);
+        }else { // non-existing account with this email
+            response.setStatusCode(230);
+            response.setMessage("User not found with email: "+request.getEmail());
         }
         return response;
     }
@@ -230,5 +243,25 @@ public class AuthenticationService {
         return response;
     }
 
+    private void revokeAllUserTokens(AppUser appUser){
+        var validUserTokens = tokenRepository.findAllValidTokensByUser(appUser.getId());
+        if (validUserTokens.isEmpty()){
+            return;
+        }
+        validUserTokens.forEach(t -> {
+            t.setExpired(true);
+            t.setRevoked(true);
+        });
+        tokenRepository.saveAll(validUserTokens);
+    }
+
+    private static Token saveAppUserJWTToken(AppUser appUser, String generatedJWTToken) {
+        return Token.builder()
+                .appUser(appUser)
+                .token(generatedJWTToken)
+                .revoked(false)
+                .expired(false)
+                .build();
+    }
 
 }

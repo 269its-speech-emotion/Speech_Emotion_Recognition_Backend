@@ -1,20 +1,25 @@
 package com.kmits.projects.speechemotionrecognition.services;
 
 import com.kmits.projects.speechemotionrecognition.dtos.appUser.AppUserResponseDTO;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.DeleteAppUserRequestDTO;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.DeleteAppUserResponseDTO;
 import com.kmits.projects.speechemotionrecognition.entities.AppUser;
 import com.kmits.projects.speechemotionrecognition.entities.AppUserDetails;
 import com.kmits.projects.speechemotionrecognition.repositories.AppUserRepository;
 import com.kmits.projects.speechemotionrecognition.utils.Utils;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
+@RequiredArgsConstructor
 public class AppUserService {
-    @Autowired
-    private AppUserRepository appUserRepository;
+
+    private final AppUserRepository appUserRepository;
 
     public AppUserResponseDTO getSelf(){
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -22,32 +27,46 @@ public class AppUserService {
         try{
             AppUserDetails userPrincipal = (AppUserDetails) auth.getPrincipal();
 
-            AppUser appUser = appUserRepository.findById(userPrincipal.getId())
-                    .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userPrincipal.getId()));
+            Optional<AppUser> optionalAppUser = appUserRepository.findById(userPrincipal.getId());
 
-            response.setStatusCode(200);
-            response.setMessage("AppUser retrieved successfully.");
-            response.setUsername(appUser.getUsername());
-            response.setEmail(appUser.getEmail());
-            response.setAudioRecordings(Utils.mapAppUserToAppUserDTO(appUser).getAudioRecordings());
+            if(optionalAppUser.isPresent()){
+                var appUser = optionalAppUser.get();
 
-            return response;
+                response.setStatusCode(200);
+                response.setMessage("AppUser retrieved successfully.");
+                response.setUsername(appUser.getUsername());
+                response.setEmail(appUser.getEmail());
+                response.setAudioRecordings(Utils.mapAppUserToAppUserDTO(appUser).getAudioRecordings());
+            }else{
+                response.setStatusCode(210);
+                response.setMessage("This user does not exist.");
+            }
         }catch (EntityNotFoundException e){
-            response.setStatusCode(404);
+            response.setStatusCode(220);
             response.setMessage(e.getMessage());
-
-            return response;
         }
+        return response;
     }
 
 
-    public void deleteAppUser(Long id){
+    public DeleteAppUserResponseDTO deleteAppUser(DeleteAppUserRequestDTO request){
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         AppUserDetails userPrincipal = (AppUserDetails) auth.getPrincipal();
 
-        AppUser appUser = appUserRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        var response = new DeleteAppUserResponseDTO();
 
-        appUserRepository.delete(appUser);
+        Optional<AppUser> optionalAppUser = appUserRepository.findById(request.getId());
+
+        if(optionalAppUser.isPresent()){
+            appUserRepository.delete(optionalAppUser.get());
+
+            response.setStatusCode(200);
+            response.setMessage("User deleted successfully");
+        }else {
+            response.setStatusCode(210);
+            response.setMessage("User not found");
+        }
+
+        return response;
     }
 }

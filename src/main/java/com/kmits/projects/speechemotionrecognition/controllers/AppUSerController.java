@@ -1,17 +1,19 @@
 package com.kmits.projects.speechemotionrecognition.controllers;
 
 import com.kmits.projects.speechemotionrecognition.dtos.appUser.AppUserResponseDTO;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.DeleteAppUserRequestDTO;
+import com.kmits.projects.speechemotionrecognition.dtos.auth.DeleteAppUserResponseDTO;
 import com.kmits.projects.speechemotionrecognition.services.AppUserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
 public class AppUSerController {
 
-    @Autowired
-    private AppUserService appUserService;
+    private final AppUserService appUserService;
 
     @GetMapping("get-self")
     public ResponseEntity<AppUserResponseDTO> getSelf(){
@@ -20,7 +22,8 @@ public class AppUSerController {
     }
 
     @DeleteMapping("/delete-self/{id}")
-    public void deleteSelf(@PathVariable Long id){
-        appUserService.deleteAppUser(id);
+    public ResponseEntity<DeleteAppUserResponseDTO> deleteSelf(@PathVariable DeleteAppUserRequestDTO request){
+        DeleteAppUserResponseDTO response = appUserService.deleteAppUser(request);
+        return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 }

@@ -1,13 +1,14 @@
 package com.kmits.projects.speechemotionrecognition.security;
 
 import com.kmits.projects.speechemotionrecognition.entities.AppUserDetails;
+import com.kmits.projects.speechemotionrecognition.repositories.TokenRepository;
 import com.kmits.projects.speechemotionrecognition.services.AppUserDetailsService;
 import com.kmits.projects.speechemotionrecognition.services.JWTService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,13 +19,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+@RequiredArgsConstructor
 public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JWTService jwtService;
+    private final JWTService jwtService;
 
-    @Autowired
-    private AppUserDetailsService appUserDetailsService;
+    private final AppUserDetailsService appUserDetailsService;
+
+    private final TokenRepository tokenRepository;
 
     @Override
     protected void doFilterInternal(
@@ -45,8 +47,11 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             AppUserDetails appUserDetails = (AppUserDetails) appUserDetailsService.loadUserByUsername(username);
+            var isTokenValid = tokenRepository.findByToken(token)
+                    .map(t -> !t.isExpired() && !t.isRevoked())
+                    .orElse(false);
 
-            if (jwtService.isValidToken(token, appUserDetails)) {
+            if (jwtService.isValidToken(token, appUserDetails) && isTokenValid) {
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                         appUserDetails, null, appUserDetails.getAuthorities()
                 );

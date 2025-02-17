@@ -5,8 +5,7 @@ import lombok.Data;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class VerificationResponseDTO {
+public class DeleteAppUserResponseDTO {
     private int statusCode;
-    private boolean enabled;
     private String message;
 }

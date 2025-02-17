@@ -3,8 +3,9 @@ package com.kmits.projects.speechemotionrecognition.controllers;
 import com.kmits.projects.speechemotionrecognition.dtos.auth.*;
 import com.kmits.projects.speechemotionrecognition.services.AuthenticationService;
 import com.kmits.projects.speechemotionrecognition.services.JWTService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,13 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/api/v1/auth")
 @RestController
+@RequiredArgsConstructor
 public class AuthenticationController {
 
-    @Autowired
-    private AuthenticationService authenticationService;
+    private final AuthenticationService authenticationService;
 
-    @Autowired
-    private JWTService jwtService;
+    private final JWTService jwtService;
+
+    private final LogoutHandler logoutHandler;
 
     @PostMapping("/signup")
     public ResponseEntity<SignUpResponseDTO> signup(@RequestBody SignUpRequestDTO request){
@@ -30,6 +32,7 @@ public class AuthenticationController {
     @PostMapping("/login")
     public ResponseEntity<LogInResponseDTO> login(@RequestBody LogInRequestDTO request){
         LogInResponseDTO response = authenticationService.login(request);
+        System.out.println(response.toString());
         return ResponseEntity.status(response.getStatusCode()).body(response);
     }
 

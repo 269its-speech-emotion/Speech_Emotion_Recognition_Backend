@@ -5,7 +5,7 @@ import com.kmits.projects.speechemotionrecognition.repositories.AppUserRepositor
 import com.kmits.projects.speechemotionrecognition.repositories.AudioRecordingRepository;
 import com.kmits.projects.speechemotionrecognition.requests.audiorecording.GetAudioRecordingResponse;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,12 +16,12 @@ import java.util.List;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class AudioRecordingService {
-    @Autowired
-    private AudioRecordingRepository audioRecordingRepository;
 
-    @Autowired
-    private AppUserRepository appUserRepository;
+    private final AudioRecordingRepository audioRecordingRepository;
+
+    private final AppUserRepository appUserRepository;
 
     public AudioRecording addAudioRecording(AudioRecording request){
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
